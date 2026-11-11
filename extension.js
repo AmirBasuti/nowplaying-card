@@ -21,6 +21,12 @@ import * as QuickSettings from 'resource:///org/gnome/shell/ui/quickSettings.js'
 import * as Signals from 'resource:///org/gnome/shell/misc/signals.js';
 import * as Slider from 'resource:///org/gnome/shell/ui/slider.js';
 import * as Volume from 'resource:///org/gnome/shell/ui/status/volume.js';
+import {pinnedPosition} from './pinnedLayout.js';
+import {activeLineIndex, lyricsTrack} from './lyrics.js';
+import {LyricsService} from './lyricsService.js';
+import {lyricsDirection, lyricsEmphasis} from './lyricsPresentation.js';
+import {spotifyTrackId} from './spotifyLyrics.js';
+import {wordHighlights} from './wordTiming.js';
 
 const N_COLUMNS = 2;
 
@@ -102,6 +108,7 @@ const PANEL_APP_ICON_SIZE = 16;
 const HAS_CLICK_GESTURE = typeof Clutter.ClickGesture !== 'undefined';
 
 const POLL_MS = 1000;
+const LYRICS_SLOT_HEIGHT = 56;
 const SEEK_SETTLE_MS = 1000;
 const SEEK_GUARD_MS = 800;
 const SEEK_COALESCE_MS = 200;
@@ -111,10 +118,7 @@ const BADGE_SIZE = 14;
 const FULL_BADGE_SIZE = 18;
 // How far the badge stops short of the corner of the cover.
 const BADGE_INSET = 2;
-const VOLUME_ICON_SIZE = 16;
 const VOLUME_STEP = 0.05;
-const VOLUME_COALESCE_MS = 100;
-const VOLUME_GUARD_MS = 800;
 
 // The cover sizes the preferences offer, against the height of the text
 // beside the cover. Medium is just as tall.
@@ -1621,7 +1625,6 @@ const CARD_OPTIONS = {
     coverSize: COVER_SIZES[DEFAULTS['cover-size']],
     showArtwork: DEFAULTS['show-artwork'],
     showProgress: DEFAULTS['show-progress'],
-    showVolume: DEFAULTS['show-volume'],
     showLoopShuffle: DEFAULTS['show-loop-shuffle'],
     sortPlayingFirst: DEFAULTS['sort-playing-first'],
     scrollText: DEFAULTS['scroll-text'],
@@ -1662,15 +1665,26 @@ const MediaCard = GObject.registerClass({
         this._trackId = null;
         this._dragging = false;
         this._settingValue = false;
-        this._volumeDragging = false;
-        this._settingVolume = false;
-        this._volumePendingId = null;
-        this._volumeGuardUntil = 0;
-        this._unmutedVolume = 1;
         this._pollId = null;
         this._seekPendingId = null;
         this._ignorePositionUntil = 0;
         this._cancellable = new Gio.Cancellable();
+
+        this._lyricsOpen = false;
+        this._lyricsTrack = null;
+        this._lyricsData = null;
+        this._lyricsRows = [];
+        this._lyricsActive = -1;
+        this._lyricsSerial = 0;
+        this._lyricsCancellable = null;
+        this._lyricsProvider = null;
+        this._lyricsScrollId = null;
+        this._lyricsScrollTarget = 0;
+        this._lyricsScrollPending = false;
+        this._lyricsScrollDuration = 0;
+        this._lyricsFrameId = null;
+        this._lyricsDestroyed = false;
+        this._positionSampleTime = GLib.get_monotonic_time();
 
         this._compact = false;
         this._compactApplied = false;
@@ -1775,10 +1789,9 @@ const MediaCard = GObject.registerClass({
 
         this._seekBox = new St.BoxLayout({
             style_class: 'np-seek-box',
-            ...VERTICAL,
             x_expand: true,
         });
-        this._column.add_child(this._seekBox);
+        this.add_child(this._seekBox);
 
         this._slider = new Slider.Slider(0);
         this._slider.add_style_class_name('np-seek');
@@ -1792,7 +1805,7 @@ const MediaCard = GObject.registerClass({
             this);
         this._seekBox.add_child(this._slider);
 
-        this._times = new St.BoxLayout({style_class: 'np-times', x_expand: true});
+        this._times = new St.BoxLayout({style_class: 'np-times', y_align: Clutter.ActorAlign.CENTER});
         this._seekBox.add_child(this._times);
         const times = this._times;
 
@@ -1802,61 +1815,80 @@ const MediaCard = GObject.registerClass({
         this._lengthLabel = new St.Label({style_class: 'np-time'});
         times.add_child(this._lengthLabel);
 
-        this._volumeBox = new St.BoxLayout({
-            style_class: 'np-volume-box',
-            x_expand: true,
-        });
-        this._column.add_child(this._volumeBox);
-
-        this._volumeIcon = new St.Icon({
-            style_class: 'np-volume-icon',
-            icon_name: 'audio-volume-high-symbolic',
-            icon_size: VOLUME_ICON_SIZE,
-        });
-        // The speaker mutes, and a second click brings the level back.
-        const muteButton = new St.Button({
-            style_class: 'np-control np-volume-button',
-            can_focus: true,
-            child: this._volumeIcon,
-            y_align: Clutter.ActorAlign.CENTER,
-        });
-        muteButton.connect('clicked', () => {
-            const value = this._volumeSlider.value;
-            if (value > 0.001)
-                this._unmutedVolume = value;
-            this._volumeSlider.value = value > 0.001 ? 0 : this._unmutedVolume;
-        });
-        this._volumeBox.add_child(muteButton);
-
-        this._volumeSlider = new Slider.Slider(0);
-        this._volumeSlider.add_style_class_name('np-volume');
-        this._volumeSlider.connectObject(
-            'drag-begin', () => (this._volumeDragging = true),
-            'drag-end', () => {
-                this._volumeDragging = false;
-                this._pushVolume();
-            },
-            'notify::value', () => this._onVolumeValue(),
-            this);
-        this._volumeBox.add_child(this._volumeSlider);
-
         this._controls = new St.BoxLayout({
             style_class: 'np-controls',
-            x_expand: true,
+            x_expand: false,
             y_align: Clutter.ActorAlign.CENTER,
         });
-        this._column.insert_child_below(this._controls, this._seekBox);
+        this._headerRow.add_child(this._controls);
 
         this._shuffleButton = this._addControl(this._controls, 'media-playlist-shuffle-symbolic',
             CONTROL_ICON_SIZE, () => this._player.setShuffle(!this._player.shuffle));
-        this._prevButton = this._addControl(this._controls, 'media-seek-backward-symbolic',
-            CONTROL_ICON_SIZE, () => this._player.previous(), -PRESS_NUDGE);
+        this._prevButton = this._addControl(this._controls, 'media-skip-backward-symbolic',
+            14, () => this._player.previous(), -PRESS_NUDGE);
         this._playButton = this._addControl(this._controls, 'media-playback-start-symbolic',
-            PLAY_ICON_SIZE, () => this._player.playPause());
-        this._nextButton = this._addControl(this._controls, 'media-seek-forward-symbolic',
-            CONTROL_ICON_SIZE, () => this._player.next(), PRESS_NUDGE);
+            16, () => this._player.playPause());
+        this._playButton.add_style_class_name('np-transport-primary');
+        this._nextButton = this._addControl(this._controls, 'media-skip-forward-symbolic',
+            14, () => this._player.next(), PRESS_NUDGE);
         this._loopButton = this._addControl(this._controls, 'media-playlist-repeat-symbolic',
             CONTROL_ICON_SIZE, () => this._cycleLoop());
+
+        this._lyricsButton = new St.Button({
+            style_class: 'np-control np-lyrics-toggle',
+            child: new St.Icon({icon_name: 'media-view-subtitles-symbolic', icon_size: 14}),
+            accessible_name: _('Show or hide lyrics'),
+            can_focus: true,
+            x_expand: false,
+            x_align: Clutter.ActorAlign.CENTER,
+            toggle_mode: true,
+        });
+        this._lyricsButton.connect('clicked', () => this._toggleLyrics());
+        this._controls.add_child(this._lyricsButton);
+
+        this._lyricsBox = new St.BoxLayout({
+            style_class: 'np-lyrics-box', ...VERTICAL, x_expand: true, visible: false,
+        });
+        this.add_child(this._lyricsBox);
+        this._lyricsMode = {text: 'LRCLIB'};
+        this._lyricsScroll = new St.ScrollView({
+            style_class: 'np-lyrics-scroll', x_expand: true,
+            overlay_scrollbars: true,
+        });
+        this._lyricsScroll.set_policy(St.PolicyType.NEVER, St.PolicyType.AUTOMATIC);
+        this._lyricsContent = new St.BoxLayout({
+            style_class: 'np-lyrics-content', ...VERTICAL, x_expand: true,
+        });
+        if (this._lyricsScroll.set_child)
+            this._lyricsScroll.set_child(this._lyricsContent);
+        else
+            this._lyricsScroll.add_actor(this._lyricsContent);
+        this._lyricsBox.add_child(this._lyricsScroll);
+        this._lyricsAdjustment().connectObject(
+            'notify::upper', () => this._applyLyricsScroll(),
+            'notify::page-size', () => this._applyLyricsScroll(),
+            this);
+        St.ThemeContext.get_for_stage(global.stage).connectObject(
+            'notify::scale-factor', () => {
+                if (this._lyricsData?.kind === 'synced')
+                    this._scrollLyricsTo(this._lyricsActive, 0);
+            }, this);
+        this._lyricsRetry = new St.Button({
+            style_class: 'np-control np-lyrics-retry', label: _('Retry'),
+            can_focus: true, visible: false,
+        });
+        this._lyricsRetry.connect('clicked', () => this._loadLyrics());
+        this._lyricsBox.add_child(this._lyricsRetry);
+        this._lyricsBox.connect('notify::mapped', () => {
+            if (!this._lyricsBox.mapped)
+                this._stopLyricsMotion();
+            else if (this._lyricsData?.kind === 'synced') {
+                // Restore stopped emphasis as well as the scroll position.
+                this._lyricsActive = -2;
+                this._syncLyricsPosition();
+            }
+            this._updateLyricsFrame();
+        });
 
         // Clicking the body of a compact card asks the stack to open this one.
         // Buttons and sliders are reactive themselves, so a press on them
@@ -1894,11 +1926,11 @@ const MediaCard = GObject.registerClass({
     }
 
     _addControl(parent, iconName, iconSize, callback, nudge = 0) {
-        // A full card spreads the buttons over its row.
+        // Intrinsic buttons form a small transport group beside the title.
         const button = new St.Button({
             style_class: 'np-control',
             can_focus: true,
-            x_expand: true,
+            x_expand: false,
             x_align: Clutter.ActorAlign.CENTER,
             child: new St.Icon({
                 style_class: 'popup-menu-icon',
@@ -1955,15 +1987,11 @@ const MediaCard = GObject.registerClass({
         const compact = this._compact;
         const options = this._options;
         const player = this._player;
+        this._lyricsButton.visible = !compact;
+        this._lyricsBox.visible = !compact && this._lyricsOpen;
 
         if (compact !== this._compactApplied) {
             this._compactApplied = compact;
-            this._controls.get_parent().remove_child(this._controls);
-            if (compact)
-                this._headerRow.add_child(this._controls);
-            else
-                this._column.insert_child_below(this._controls, this._seekBox);
-            this._controls.x_expand = !compact;
 
             if (compact)
                 this.add_style_class_name('np-card-compact');
@@ -1976,32 +2004,28 @@ const MediaCard = GObject.registerClass({
         this._subtitle.scroll = options.scrollText;
 
         // No room for columns here, so these bars follow the sound instead.
-        this._equalizer.visible = !compact;
-        this._equalizer.animate = options.animate;
+        this._equalizer.visible = false;
+        this._equalizer.animate = false;
         this._equalizer.frameRate = options.frameRate;
         this._equalizer.iconStyle = options.equalizerStyle;
         this._equalizer.accent = options.equalizerAccent;
         this._equalizer.analyzer = options.analyzer;
-        this._equalizer.playing = this.playing;
+        this._equalizer.playing = false;
 
-        const controlSize = compact
-            ? COMPACT_CONTROL_ICON_SIZE : CONTROL_ICON_SIZE;
-        const skipSize = compact ? COMPACT_CONTROL_ICON_SIZE : SKIP_ICON_SIZE;
+        const controlSize = 18;
+        const skipSize = 18;
         this._prevButton.child.icon_size = skipSize;
         this._nextButton.child.icon_size = skipSize;
         this._shuffleButton.child.icon_size = controlSize;
         this._loopButton.child.icon_size = controlSize;
-        this._playButton.child.icon_size = compact
-            ? COMPACT_PLAY_ICON_SIZE : PLAY_ICON_SIZE;
+        this._playButton.child.icon_size = 20;
+        this._lyricsButton.child.icon_size = 18;
 
         // Shuffle and repeat only make sense for a player that has them, and
         // the compact row has no space for them anyway.
-        const toggles = !compact && options.showLoopShuffle && player.canControl;
-        this._shuffleButton.visible = toggles && player.hasShuffle;
-        this._loopButton.visible = toggles && player.hasLoop;
+        this._shuffleButton.visible = false;
+        this._loopButton.visible = false;
 
-        this._volumeBox.visible = !compact && options.showVolume &&
-            player.hasVolume;
         // Empty rows keep their place, so the card stays one size from track
         // to track. Folded, the cover is taller than both lines anyway.
         this._subtitle.visible = !compact || this._subtitle.text !== '';
@@ -2010,9 +2034,9 @@ const MediaCard = GObject.registerClass({
         this._slider.can_focus = this._lengthUs > 0;
         this._slider.reactive = player.canSeek && this._lengthUs > 0;
         // The badge says which player a card belongs to, folded or not.
-        this._badge.icon_size = compact ? BADGE_SIZE : FULL_BADGE_SIZE;
+        this._badge.icon_size = 10;
         this._placeBadge();
-        this._badge.visible = this._hasArtwork && !!this._badge.gicon;
+        this._badge.visible = false;
         // Last, once every row above knows whether it is shown.
         this._syncCover();
     }
@@ -2030,6 +2054,17 @@ const MediaCard = GObject.registerClass({
     }
 
     _sync() {
+        if (this._lastPlayback !== this.playing) {
+            const now = GLib.get_monotonic_time();
+            if (this._lastPlayback === true) {
+                this._positionUs = Math.min(this._lengthUs,
+                    this._positionUs + Math.max(0, now - this._positionSampleTime));
+            }
+            this._positionSampleTime = now;
+            this._lastPlayback = this.playing;
+            this._syncLyricsPosition();
+            this._fetchPosition();
+        }
         this._title.text = this._player.trackTitle || '';
         const subtitle = this._subtitleText();
         this._subtitle.text = subtitle;
@@ -2072,7 +2107,6 @@ const MediaCard = GObject.registerClass({
 
         this._syncShuffle();
         this._syncLoop();
-        this._syncVolume();
         this._syncTrack();
         this._applyLayout();
         this._updatePoll();
@@ -2105,67 +2139,8 @@ const MediaCard = GObject.registerClass({
 
     // Same deal as the seek bar: a value we just wrote comes back as a
     // property change, and it must not fight the handle under the pointer.
-    _syncVolume() {
-        const volume = this._player.volume;
-        if (volume === null || this._volumeDragging || this._volumePendingId ||
-            GLib.get_monotonic_time() < this._volumeGuardUntil)
-            return;
-
-        this._settingVolume = true;
-        this._volumeSlider.value = Math.max(0, Math.min(1, volume));
-        this._settingVolume = false;
-        this._syncVolumeIcon();
-        this._keepUnmutedVolume();
-    }
-
-    _syncVolumeIcon() {
-        const value = this._volumeSlider.value;
-        let iconName = 'audio-volume-high-symbolic';
-        if (value <= 0.001)
-            iconName = 'audio-volume-muted-symbolic';
-        else if (value < 0.34)
-            iconName = 'audio-volume-low-symbolic';
-        else if (value < 0.67)
-            iconName = 'audio-volume-medium-symbolic';
-
-        this._volumeIcon.icon_name = iconName;
-    }
-
-    _onVolumeValue() {
-        if (this._settingVolume)
-            return;
-
-        this._syncVolumeIcon();
-
-        // Dragging writes once on release; scroll and arrow keys have no
-        // release, so their steps are coalesced into one write.
-        if (this._volumeDragging)
-            return;
-
-        if (this._volumePendingId)
-            GLib.source_remove(this._volumePendingId);
-
-        this._volumePendingId = GLib.timeout_add(GLib.PRIORITY_DEFAULT,
-            VOLUME_COALESCE_MS, () => {
-                this._volumePendingId = null;
-                this._pushVolume();
-                return GLib.SOURCE_REMOVE;
-            });
-    }
-
-    _pushVolume() {
-        this._volumeGuardUntil = GLib.get_monotonic_time() + VOLUME_GUARD_MS * 1000;
-        this._keepUnmutedVolume();
-        this._player.setVolume(this._volumeSlider.value);
-    }
-
     // Only levels the player actually got, not the ones a drag down to zero
     // passes on its way.
-    _keepUnmutedVolume() {
-        if (this._volumeSlider.value > 0.001)
-            this._unmutedVolume = this._volumeSlider.value;
-    }
-
     // A file on disk or an inline picture (Telegram). Sandboxed players can
     // name files we cannot see, so the file is checked first.
     _artworkIcon(coverUrl) {
@@ -2249,7 +2224,7 @@ const MediaCard = GObject.registerClass({
         this._hasArtwork = artwork !== null;
         this._artAspect = artwork?.aspect ?? null;
         this._cover.gicon = artwork?.gicon ?? this._fallbackIcon(this._coverApp);
-        this._badge.visible = this._hasArtwork && !!this._badge.gicon;
+        this._badge.visible = false;
         this._syncCover();
     }
 
@@ -2379,11 +2354,8 @@ const MediaCard = GObject.registerClass({
             return;
 
         const scale = scaleFactor();
-        const [, columnHeight] = this._column.get_preferred_height(-1);
-        const beside = Math.round(columnHeight / scale);
-        const box = this._compact
-            ? COMPACT_COVER_SIZE
-            : Math.round(beside * this._options.coverSize);
+        const box = this._compact ? 38
+            : Math.max(56, Math.min(72, Math.round(64 * this._options.coverSize)));
 
         // The tile is a square as tall as the card, and the picture covers it:
         // its shorter side matches the square, the longer one runs past the
@@ -2473,6 +2445,398 @@ const MediaCard = GObject.registerClass({
             this._setPositionUs(0);
             this._fetchPosition();
         }
+        this._syncLyricsTrack();
+    }
+
+    _syncLyricsTrack() {
+        const track = lyricsTrack(this._player.trackTitle, this._player.trackArtists,
+            this._metadataValue('xesam:album'), this._lengthUs,
+            spotifyTrackId(this._metadataValue('xesam:url'), this._trackId));
+        this._lyricsButton.reactive = !!track || this._lyricsOpen;
+        this._lyricsButton.can_focus = !!track || this._lyricsOpen;
+        if (track?.key === this._lyricsTrack?.key)
+            return;
+        this._cancelLyrics();
+        this._lyricsTrack = track;
+        this._lyricsData = null;
+        this._lyricsActive = -1;
+        if (this._lyricsOpen)
+            this._loadLyrics();
+    }
+
+    _cancelLyrics() {
+        this._lyricsSerial++;
+        this._lyricsCancellable?.cancel();
+        this._lyricsCancellable = null;
+        this._stopLyricsMotion();
+    }
+
+    _lyricsAdjustment() {
+        return this._lyricsScroll.get_vadjustment
+            ? this._lyricsScroll.get_vadjustment()
+            : this._lyricsScroll.get_vscroll_bar().get_adjustment();
+    }
+
+    _stopLyricsScroll() {
+        if (this._lyricsScrollId) {
+            GLib.source_remove(this._lyricsScrollId);
+            this._lyricsScrollId = null;
+        }
+        this._lyricsAdjustment().remove_transition('value');
+        this._lyricsScrollPending = false;
+    }
+
+    _scrollLyricsTo(index, duration) {
+        this._lyricsScrollTarget = Math.max(0, index + 1) * LYRICS_SLOT_HEIGHT * scaleFactor();
+        this._lyricsScrollDuration = duration;
+        this._lyricsScrollPending = true;
+        this._applyLyricsScroll();
+    }
+
+    _applyLyricsScroll() {
+        if (!this._lyricsScrollPending || !this._lyricsBox.mapped ||
+            this._lyricsData?.kind !== 'synced')
+            return;
+        const adjustment = this._lyricsAdjustment();
+        const page = 4 * LYRICS_SLOT_HEIGHT * scaleFactor();
+        // Wait for the scroll view's real allocation, rather than guessing
+        // that an idle callback runs after layout.
+        if (Math.abs(adjustment.page_size - page) > 1 ||
+            adjustment.upper - adjustment.page_size + 1 < this._lyricsScrollTarget)
+            return;
+        this._lyricsScrollPending = false;
+        adjustment.ease(this._lyricsScrollTarget, {
+            duration: this._lyricsScrollDuration,
+            mode: Clutter.AnimationMode.EASE_OUT_CUBIC,
+        });
+    }
+
+    _stopLyricsMotion() {
+        this._stopLyricsScroll();
+        if (this._lyricsFrameId) {
+            GLib.source_remove(this._lyricsFrameId);
+            this._lyricsFrameId = null;
+        }
+        for (const row of this._lyricsRows) {
+            for (const property of ['opacity', 'scale-x', 'scale-y', '@effects.np-lyrics-blur.radius'])
+                row.remove_transition(property);
+            row.clutter_text.remove_transition('color');
+            row._lyricsToneDuration = 0;
+            row._lyricsToneFrom = null;
+            row.remove_effect_by_name('np-lyrics-blur');
+        }
+    }
+
+    _syncLyricsTone(row) {
+        if (!row.get_stage() || !Number.isInteger(row._lyricsIndex))
+            return;
+        const foreground = row.get_theme_node().get_foreground_color();
+        const light = foreground.get_red() + foreground.get_green() + foreground.get_blue() < 1.5;
+        // St supplies a fixed Pango foreground which overrides Text.color.
+        const attributes = row.clutter_text.get_attributes()?.copy() ?? new Pango.AttrList();
+        const removed = attributes.filter(attribute => attribute.as_color() !== null);
+        // Noto Sans Arabic has generous font metrics. A compact line box
+        // preserves its glyph size while allowing two shaped lines in 56px.
+        if (row._lyricsRtl)
+            attributes.change(Pango.attr_line_height_new(0.64));
+        if (removed || row._lyricsRtl)
+            row.clutter_text.set_attributes(attributes);
+        const active = this._lyricsData?.lines?.[this._lyricsActive]?.text ? this._lyricsActive : -1;
+        const state = lyricsEmphasis(row._lyricsIndex, active, light);
+        row._lyricsLight = light;
+        row._lyricsWordSignature = null;
+        // Keep an independent color value for the transition.
+        const color = row.clutter_text.get_color().copy();
+        color.init_from_4f(...state.color.map(channel => channel / 255), 1);
+        row.clutter_text.remove_transition('color');
+        if (row._lyricsToneFrom)
+            row.clutter_text.set_color(row._lyricsToneFrom);
+        row.clutter_text.ease_property('color', color, {
+            duration: row._lyricsToneDuration ?? 0,
+            mode: Clutter.AnimationMode.EASE_OUT_CUBIC,
+        });
+        if (row._lyricsIndex === this._lyricsActive)
+            this._paintLyricsWords(this._lyricsPositionSeconds());
+    }
+
+    _syncLyricsBlur(row, radius, duration) {
+        let effect = row.get_effect('np-lyrics-blur');
+        if (!effect && radius === 0)
+            return;
+        if (!effect) {
+            effect = new Shell.BlurEffect({mode: Shell.BlurMode.ACTOR, radius: 0, brightness: 1});
+            row.add_effect_with_name('np-lyrics-blur', effect);
+        }
+        row._lyricsBlurTarget = radius;
+        row.ease_property('@effects.np-lyrics-blur.radius', radius, {
+            duration, mode: Clutter.AnimationMode.EASE_OUT_CUBIC,
+            onComplete: () => {
+                if (row._lyricsBlurTarget === 0)
+                    row.remove_effect_by_name('np-lyrics-blur');
+            },
+        });
+    }
+
+    _toggleLyrics() {
+        this._lyricsOpen = !this._lyricsOpen;
+        this._lyricsButton.checked = this._lyricsOpen;
+        this._lyricsButton.opacity = this._lyricsOpen ? 255 : 140;
+        this._lyricsButton.reactive = !!this._lyricsTrack || this._lyricsOpen;
+        this._lyricsButton.can_focus = !!this._lyricsTrack || this._lyricsOpen;
+        this._lyricsBox.visible = this._lyricsOpen && !this._compact;
+        if (!this._lyricsOpen) {
+            this._cancelLyrics();
+        } else if (this._lyricsData) {
+            this._renderLyrics(this._lyricsData);
+        } else {
+            this._loadLyrics();
+        }
+    }
+
+    _lyricsLabel(text) {
+        const label = new St.Label({text, style_class: 'np-lyrics-line', x_expand: true,
+            clip_to_allocation: true});
+        label.clutter_text.line_wrap = true;
+        label.clutter_text.line_wrap_mode = Pango.WrapMode.WORD_CHAR;
+        label.clutter_text.ellipsize = Pango.EllipsizeMode.END;
+        label.clutter_text.y_align = Clutter.ActorAlign.CENTER;
+        const rtl = lyricsDirection(text) === 'rtl';
+        label._lyricsRtl = rtl;
+        label.set_text_direction(rtl ? Clutter.TextDirection.RTL : Clutter.TextDirection.LTR);
+        label.clutter_text.set_line_alignment(Pango.Alignment.CENTER);
+        label.set_pivot_point(0.5, 0.5);
+        label.connect_after('style-changed', () => this._syncLyricsTone(label));
+        label.connect('notify::mapped', () => {
+            if (label.mapped)
+                this._syncLyricsTone(label);
+        });
+        label.clutter_text.connectObject('notify::color', () => {
+            // Actor-mode blur caches the row, including its child text.
+            if (label.mapped && label.get_effect('np-lyrics-blur'))
+                label.queue_redraw();
+        }, label);
+        if (rtl) {
+            label.add_style_class_name('np-lyrics-rtl');
+            label.connect('notify::mapped', () => {
+                if (label.mapped) {
+                    label.set_text_direction(Clutter.TextDirection.RTL);
+                    label.clutter_text.set_text_direction(Clutter.TextDirection.RTL);
+                }
+            });
+        }
+        return label;
+    }
+
+    _lyricsPlaceholder(current = false) {
+        const label = this._lyricsLabel(current ? '···' : ' ');
+        label.add_style_class_name(current ? 'np-lyrics-waiting' : 'np-lyrics-placeholder');
+        return label;
+    }
+
+    _lyricsMessage(text, retry = false) {
+        this._stopLyricsMotion();
+        this._lyricsContent.destroy_all_children();
+        this._lyricsRows = [];
+        this._lyricsActive = -1;
+        this._lyricsScroll.remove_style_class_name('np-lyrics-synced');
+        this._lyricsScroll.set_mouse_scrolling(true);
+        this._lyricsScroll.set_policy(St.PolicyType.NEVER, St.PolicyType.AUTOMATIC);
+        const label = this._lyricsLabel(text);
+        label.add_style_class_name('np-lyrics-message');
+        this._lyricsContent.add_child(label);
+        this._lyricsRetry.visible = retry;
+    }
+
+    async _loadLyrics() {
+        this._cancelLyrics();
+        this._lyricsData = null;
+        if (!this._lyricsTrack) {
+            this._lyricsMessage(_('Track information is unavailable'));
+            return;
+        }
+        const serial = this._lyricsSerial;
+        const cancellable = new Gio.Cancellable();
+        this._lyricsCancellable = cancellable;
+        this._lyricsMode.text = 'Spotify / LRCLIB';
+        this._lyricsMessage(_('Loading lyrics…'));
+        this._lyricsProvider ??= new LyricsService();
+        try {
+            const data = await this._lyricsProvider.lookup(this._lyricsTrack, cancellable);
+            if (this._lyricsDestroyed || serial !== this._lyricsSerial || !this._lyricsOpen)
+                return;
+            this._lyricsCancellable = null;
+            this._renderLyrics(data);
+        } catch {
+            if (this._lyricsDestroyed || serial !== this._lyricsSerial || !this._lyricsOpen)
+                return;
+            this._lyricsCancellable = null;
+            this._lyricsMessage(_('Could not load lyrics. Check your connection.'), true);
+        }
+    }
+
+    _renderLyrics(data) {
+        this._lyricsData = data.kind === 'rate-limited' ? null : data;
+        const source = data.source === 'Spotify' ? 'Spotify' : 'LRCLIB';
+        this._lyricsMode.text = data.kind === 'synced' ? `${_('Synced')} · ${source}` : source;
+        this._lyricsButton.accessible_name = `${_('Show or hide lyrics')} · ${this._lyricsMode.text}`;
+        const messages = {
+            missing: _('No lyrics found for this song'),
+            instrumental: _('Instrumental track — no lyrics'),
+            'rate-limited': _('Lyrics service is busy. Please try again later.'),
+        };
+        if (messages[data.kind]) {
+            this._lyricsMessage(messages[data.kind], data.kind === 'rate-limited');
+            return;
+        }
+        this._stopLyricsMotion();
+        this._lyricsContent.destroy_all_children();
+        this._lyricsRows = [];
+        this._lyricsActive = -1;
+        this._lyricsRetry.hide();
+        if (data.kind === 'plain') {
+            this._lyricsScroll.remove_style_class_name('np-lyrics-synced');
+            this._lyricsScroll.set_mouse_scrolling(true);
+            this._lyricsScroll.set_policy(St.PolicyType.NEVER, St.PolicyType.AUTOMATIC);
+            const label = this._lyricsLabel(data.text);
+            label.add_style_class_name('np-lyrics-plain');
+            label.clutter_text.ellipsize = Pango.EllipsizeMode.NONE;
+            this._lyricsContent.add_child(label);
+        } else {
+            this._lyricsScroll.add_style_class_name('np-lyrics-synced');
+            this._lyricsScroll.set_mouse_scrolling(false);
+            this._lyricsScroll.set_policy(St.PolicyType.NEVER, St.PolicyType.NEVER);
+            this._lyricsLeading = this._lyricsPlaceholder();
+            this._lyricsWaiting = this._lyricsPlaceholder(true);
+            this._lyricsContent.add_child(this._lyricsLeading);
+            this._lyricsContent.add_child(this._lyricsWaiting);
+            for (const line of data.lines) {
+                const row = this._lyricsLabel(line.text || '···');
+                row._lyricsIndex = this._lyricsRows.length;
+                row.reactive = this._player.canSeek;
+                row.connect('button-release-event', (_actor, event) => {
+                    if (event.get_button() !== Clutter.BUTTON_PRIMARY || !this._player.canSeek)
+                        return Clutter.EVENT_PROPAGATE;
+                    this._jumpToLyrics(row._lyricsIndex);
+                    return Clutter.EVENT_STOP;
+                });
+                const state = lyricsEmphasis(0, -1);
+                row.opacity = state.opacity;
+                row.scale_x = row.scale_y = state.scale;
+                this._lyricsRows.push(row);
+                this._lyricsContent.add_child(row);
+            }
+            this._lyricsTrailing = this._lyricsPlaceholder();
+            this._lyricsContent.add_child(this._lyricsTrailing);
+            this._lyricsTrailingSecond = this._lyricsPlaceholder();
+            this._lyricsContent.add_child(this._lyricsTrailingSecond);
+            this._lyricsActive = -2;
+            this._syncLyricsPosition();
+            this._updateLyricsFrame();
+        }
+    }
+
+    _lyricsPositionSeconds() {
+        const elapsed = this._lastPlayback === true
+            ? Math.max(0, GLib.get_monotonic_time() - this._positionSampleTime) / 1000000 : 0;
+        return Math.min(this._lengthUs / 1000000, this._positionUs / 1000000 + elapsed);
+    }
+
+    _jumpToLyrics(index) {
+        const line = this._lyricsData?.lines?.[index];
+        if (!this._player.canSeek || !line || this._lengthUs <= 0)
+            return;
+        const target = Math.round(line.at * 1000000);
+        this._seek(target);
+        this._setPositionUs(target);
+    }
+
+    _updateLyricsFrame() {
+        const wanted = !this._lyricsDestroyed && this._lyricsBox.mapped && this.playing &&
+            this._lyricsOpen && this._lyricsData?.kind === 'synced';
+        if (!wanted && this._lyricsFrameId) {
+            GLib.source_remove(this._lyricsFrameId);
+            this._lyricsFrameId = null;
+        } else if (wanted && !this._lyricsFrameId) {
+            // Keep the existing 1Hz D-Bus sampling; interpolate only locally.
+            this._lyricsFrameId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 33, () => {
+                this._syncLyricsPosition();
+                return GLib.SOURCE_CONTINUE;
+            });
+        }
+    }
+
+    _paintLyricsWords(seconds) {
+        if (this._lyricsData?.kind !== 'synced')
+            return;
+        const row = this._lyricsRows[this._lyricsActive];
+        if (!row?.mapped)
+            return;
+        const highlights = wordHighlights(this._lyricsData.lines[this._lyricsActive], seconds);
+        if (!highlights.length)
+            return;
+        const animate = St.Settings.get().enable_animations;
+        const amounts = highlights.map(word => animate ? Math.round(word.progress * 32) / 32
+            : word.progress > 0 ? 1 : 0);
+        const signature = `${row._lyricsLight}:${amounts.join(',')}`;
+        if (row._lyricsWordSignature === signature)
+            return;
+        const light = row._lyricsLight ?? false;
+        const sung = lyricsEmphasis(0, 0, light).color;
+        const future = lyricsEmphasis(1, 0, light).color;
+        const attributes = new Pango.AttrList();
+        if (row._lyricsRtl)
+            attributes.insert(Pango.attr_line_height_new(0.64));
+        highlights.forEach((word, i) => {
+            const color = sung.map((channel, n) =>
+                Math.round((future[n] + (channel - future[n]) * amounts[i]) * 257));
+            const attribute = Pango.attr_foreground_new(...color);
+            attribute.start_index = word.startByte;
+            attribute.end_index = word.endByte;
+            attributes.insert(attribute);
+        });
+        row.clutter_text.set_attributes(attributes);
+        row._lyricsWordSignature = signature;
+    }
+
+    _syncLyricsPosition() {
+        if (!this._lyricsOpen || this._lyricsData?.kind !== 'synced')
+            return;
+        const seconds = this._lyricsPositionSeconds();
+        const index = activeLineIndex(this._lyricsData.lines, seconds);
+        if (index === this._lyricsActive) {
+            this._paintLyricsWords(seconds);
+            return;
+        }
+        const previous = this._lyricsActive;
+        const consecutive = previous >= -1 && Math.abs(index - previous) === 1;
+        const duration = consecutive && St.Settings.get().enable_animations ? 550 : 0;
+        const affected = new Set();
+        for (const center of [previous, index]) {
+            for (let offset = -3; offset <= 3; offset++)
+                affected.add(center + offset);
+        }
+        this._lyricsActive = index;
+        const active = this._lyricsData.lines[index]?.text ? index : -1;
+        this._lyricsWaiting.text = index < 0 ? '···' : ' ';
+        for (const rowIndex of affected) {
+            const item = this._lyricsRows[rowIndex];
+            if (!item)
+                continue;
+            item._lyricsToneFrom = item.clutter_text.get_color().copy();
+            item._lyricsToneDuration = duration ? 420 : 0;
+            item._lyricsWordSignature = null;
+            if (rowIndex === index)
+                item.add_style_class_name('np-lyrics-current');
+            else
+                item.remove_style_class_name('np-lyrics-current');
+            const state = lyricsEmphasis(rowIndex, active);
+            item.ease({opacity: state.opacity, scale_x: state.scale, scale_y: state.scale,
+                duration: duration ? 420 : 0, mode: Clutter.AnimationMode.EASE_OUT_CUBIC});
+            this._syncLyricsTone(item);
+            this._syncLyricsBlur(item, state.blur, duration ? 420 : 0);
+        }
+        this._scrollLyricsTo(index, duration);
+        this._paintLyricsWords(seconds);
     }
 
     // Elapsed on the left, what is left of the track on the right.
@@ -2493,7 +2857,9 @@ const MediaCard = GObject.registerClass({
 
     _setPositionUs(positionUs) {
         this._positionUs = Math.max(0, Math.min(positionUs, this._lengthUs));
+        this._positionSampleTime = GLib.get_monotonic_time();
         this._showTime(this._positionUs);
+        this._syncLyricsPosition();
 
         // Never move the handle out from under the user.
         if (this._dragging || this._seekPendingId)
@@ -2533,9 +2899,8 @@ const MediaCard = GObject.registerClass({
             return;
 
         const targetUs = Math.round(this._slider.value * this._lengthUs);
-        this._showTime(targetUs);
         this._seek(targetUs);
-        this._positionUs = targetUs;
+        this._setPositionUs(targetUs);
     }
 
     _fetchPosition() {
@@ -2577,6 +2942,7 @@ const MediaCard = GObject.registerClass({
     }
 
     _updatePoll() {
+        this._updateLyricsFrame();
         const wanted = this.mapped && this.playing && this._lengthUs > 0;
         if (wanted && this._pollId === null)
             this._schedulePoll(POLL_MS);
@@ -2602,6 +2968,10 @@ const MediaCard = GObject.registerClass({
     }
 
     _onDestroy() {
+        this._lyricsDestroyed = true;
+        this._cancelLyrics();
+        this._lyricsProvider?.destroy();
+        this._lyricsProvider = null;
         this._stopPoll();
         this._stopArtRetry();
         this._artSession?.abort();
@@ -2609,13 +2979,8 @@ const MediaCard = GObject.registerClass({
             GLib.source_remove(this._seekPendingId);
             this._seekPendingId = null;
         }
-        if (this._volumePendingId) {
-            GLib.source_remove(this._volumePendingId);
-            this._volumePendingId = null;
-        }
         this._cancellable.cancel();
         this._slider.disconnectObject(this);
-        this._volumeSlider.disconnectObject(this);
         this._player.disconnectObject(this);
     }
 });
@@ -3546,7 +3911,6 @@ class MediaModel {
             coverSize: COVER_SIZES[size] ?? COVER_SIZES.medium,
             showArtwork: readSetting(this._settings, 'show-artwork'),
             showProgress: readSetting(this._settings, 'show-progress'),
-            showVolume: readSetting(this._settings, 'show-volume'),
             showLoopShuffle: readSetting(this._settings, 'show-loop-shuffle'),
             sortPlayingFirst: readSetting(this._settings, 'sort-playing-first'),
             scrollText: readSetting(this._settings, 'scroll-text'),
@@ -3644,7 +4008,7 @@ class NowPlayingButton extends PanelMenu.Button {
             this._clickGesture?.set_enabled(false);
             this._addGesture(this, Clutter.BUTTON_PRIMARY, () => {
                 if (!this._pointerOverControls())
-                    this.menu.toggle();
+                    this._toggleCard();
             });
             this._addGesture(this, Clutter.BUTTON_MIDDLE,
                 () => this._middleClickAction());
@@ -3696,6 +4060,11 @@ class NowPlayingButton extends PanelMenu.Button {
         }
 
         this._contextMenu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+        this._pinItem = new PopupMenu.PopupSwitchMenuItem(
+            _('Keep Card on Screen'), this._settings.get_boolean('pin-card'));
+        this._pinItem.connect('toggled', (_item, active) =>
+            this._settings.set_boolean('pin-card', active));
+        this._contextMenu.addMenuItem(this._pinItem);
         this._contextMenu.addAction(_('Settings'), () => openPreferences());
 
         this._contextMenu.connectObject('open-state-changed', (_menu, open) => {
@@ -3707,6 +4076,7 @@ class NowPlayingButton extends PanelMenu.Button {
     }
 
     _syncContextMenu() {
+        this._pinItem?.setToggleState(this._settings.get_boolean('pin-card'));
         const current = readSetting(this._settings, 'indicator-visibility');
         for (const [value, item] of this._visibilityItems)
             item.setOrnament(value === current
@@ -3776,6 +4146,13 @@ class NowPlayingButton extends PanelMenu.Button {
         if (HAS_CLICK_GESTURE)
             return Clutter.EVENT_PROPAGATE;
 
+        if (type === Clutter.EventType.BUTTON_PRESS &&
+            event.get_button() === Clutter.BUTTON_PRIMARY &&
+            !this._pointerOverControls()) {
+            this._toggleCard();
+            return Clutter.EVENT_STOP;
+        }
+
         const middle = type === Clutter.EventType.BUTTON_PRESS &&
             event.get_button() === Clutter.BUTTON_MIDDLE;
 
@@ -3789,6 +4166,12 @@ class NowPlayingButton extends PanelMenu.Button {
         }
 
         return super.vfunc_event(event);
+    }
+
+    _toggleCard() {
+        this.menu.close();
+        this._settings.set_boolean('pin-card',
+            !this._settings.get_boolean('pin-card'));
     }
 
     _onScroll(event) {
@@ -4047,10 +4430,81 @@ class BuiltinMediaHider {
     }
 }
 
+// Reuse the original card stack without opening a popup or taking a modal
+// grab. Only the card's own rectangle receives input; other windows remain
+// usable while it stays above them.
+const PinnedCard = GObject.registerClass(
+class PinnedCard extends St.BoxLayout {
+    _init(settings) {
+        super._init({
+            style_class: 'popup-menu-content np-menu np-pinned',
+            reactive: true,
+            ...VERTICAL,
+        });
+        this._settings = settings;
+        this._model = new MediaModel(settings, {
+            keepStackVisible: false,
+            divided: true,
+            closeMenu: () => {},
+        });
+        this._model.notifyVisibility = () => this._syncVisibility();
+        this._monitorId = Main.layoutManager.connect('monitors-changed',
+            () => this._place());
+        this._workAreaId = global.display.connect('workareas-changed',
+            () => this._place());
+        this._sessionId = Main.sessionMode.connect('updated',
+            () => this._syncVisibility());
+        this._overviewShowId = Main.overview.connect('showing', () => this.hide());
+        this._overviewHideId = Main.overview.connect('hidden',
+            () => this._syncVisibility());
+        this.connect('notify::width', () => this._place());
+        this.connect('notify::height', () => this._place());
+        this.connect('destroy', () => {
+            Main.layoutManager.disconnect(this._monitorId);
+            global.display.disconnect(this._workAreaId);
+            Main.sessionMode.disconnect(this._sessionId);
+            Main.overview.disconnect(this._overviewShowId);
+            Main.overview.disconnect(this._overviewHideId);
+            this._model.destroy();
+            this._model = null;
+            this._settings = null;
+        });
+    }
+
+    mount() {
+        this.add_child(this._model.stack);
+        followInk(this);
+        this.sync();
+    }
+
+    _syncVisibility() {
+        this.visible = this._model.stack.nPlayers > 0 &&
+            !Main.sessionMode.isLocked && !Main.sessionMode.isGreeter &&
+            !Main.overview.visible;
+        this._place();
+    }
+
+    _place() {
+        if (!this._settings || Main.layoutManager.primaryIndex < 0)
+            return;
+        const area = Main.layoutManager.getWorkAreaForMonitor(
+            Main.layoutManager.primaryIndex);
+        const {x, y} = pinnedPosition(area, this.width, this.height,
+            this._settings.get_string('pinned-corner'));
+        this.set_position(x, y);
+    }
+
+    sync() {
+        this._model.sync();
+        this._syncVisibility();
+    }
+});
+
 export default class NowPlayingExtension extends Extension {
     enable() {
         this._settings = this.getSettings();
         this._settings.connectObject(
+            'changed', () => this._syncPinned(),
             'changed::location', () => this._rebuild(),
             'changed::panel-box', () => this._rebuild(),
             'changed::panel-index', () => this._rebuild(),
@@ -4072,7 +4526,6 @@ export default class NowPlayingExtension extends Extension {
             'changed::cover-size', () => this._host?._model.sync(),
             'changed::show-artwork', () => this._host?._model.sync(),
             'changed::show-progress', () => this._host?._model.sync(),
-            'changed::show-volume', () => this._host?._model.sync(),
             'changed::show-loop-shuffle', () => this._host?._model.sync(),
             'changed::sort-playing-first', () => this._host?._model.sync(),
             'changed::scroll-text', () => this._host?._model.sync(),
@@ -4119,9 +4572,11 @@ export default class NowPlayingExtension extends Extension {
                 readSetting(this._settings, 'panel-index'),
                 readSetting(this._settings, 'panel-box'));
         }
+        this._syncPinned();
     }
 
     _destroyHost() {
+        this._destroyPinned();
         this._host?.destroy();
         this._host = null;
     }
@@ -4129,5 +4584,28 @@ export default class NowPlayingExtension extends Extension {
     _rebuild() {
         this._destroyHost();
         this._build();
+    }
+
+    _syncPinned() {
+        if (!this._settings?.get_boolean('pin-card')) {
+            this._destroyPinned();
+        } else if (!this._pinnedHost) {
+            this._pinnedHost = new PinnedCard(this._settings);
+            Main.layoutManager.addChrome(this._pinnedHost, {
+                trackFullscreen: false,
+            });
+            this._pinnedHost.mount();
+        } else {
+            this._pinnedHost.sync();
+        }
+        this._host?._syncContextMenu?.();
+    }
+
+    _destroyPinned() {
+        if (!this._pinnedHost)
+            return;
+        Main.layoutManager.removeChrome(this._pinnedHost);
+        this._pinnedHost.destroy();
+        this._pinnedHost = null;
     }
 }

@@ -7,36 +7,28 @@
 # that then fails aborts the whole session.
 set -euo pipefail
 
-uuid=nowplaying@epogonii.github.io
+uuid=nowplaying-pinned@local
 src=$(cd "$(dirname "$0")/.." && pwd)
 dst=${XDG_DATA_HOME:-$HOME/.local/share}/gnome-shell/extensions/$uuid
-
-mkdir -p "$dst/schemas" "$dst/icons/qr"
+staging=$(mktemp -d)
+trap 'rm -rf -- "$staging"' EXIT
 
 install_file() {
     local from=$1 to=$2
+    mkdir -p "$(dirname "$to")"
     cp "$from" "$to.tmp"
     mv -f "$to.tmp" "$to"
 }
 
-python3 "$src/tools/gen-stylesheets.py"
+payload=$staging/extension
+"$src/tools/pack-extension.sh" "$staging"
+unzip -q "$staging/$uuid.shell-extension.zip" -d "$payload"
+glib-compile-schemas --strict "$payload/schemas"
 
-# LICENSE comes along the same as it does in the packed zip: the copy on disk
-# should carry the terms it is given under.
-for f in metadata.json extension.js prefs.js spectrum.js stylesheet.css \
-         stylesheet-light.css stylesheet-dark.css LICENSE; do
-    install_file "$src/$f" "$dst/$f"
-done
-install_file "$src/schemas/org.gnome.shell.extensions.nowplaying.gschema.xml" \
-    "$dst/schemas/org.gnome.shell.extensions.nowplaying.gschema.xml"
-
-# The QR codes the About page shows, drawn by tools/gen-qr.sh.
-for f in "$src"/icons/qr/*.svg; do
-    install_file "$f" "$dst/icons/qr/$(basename "$f")"
-done
-
-glib-compile-schemas --targetdir "$src/schemas" "$src/schemas"
-install_file "$src/schemas/gschemas.compiled" "$dst/schemas/gschemas.compiled"
+while IFS= read -r -d '' file; do
+    install_file "$file" "$dst/${file#"$payload/"}"
+done < <(find "$payload" -type f ! -name gschemas.compiled -print0)
+install_file "$payload/schemas/gschemas.compiled" "$dst/schemas/gschemas.compiled"
 
 echo "installed to $dst"
 echo "log out and back in - a running shell keeps the old code in memory"

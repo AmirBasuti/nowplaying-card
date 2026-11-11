@@ -105,6 +105,25 @@ export default class NowPlayingPreferences extends ExtensionPreferences {
         const placement = new Adw.PreferencesGroup({title: _('Placement')});
         panelPage.add(placement);
 
+        const pinned = new Adw.PreferencesGroup({title: _('Pinned card')});
+        panelPage.add(pinned);
+        const pinRow = new Adw.SwitchRow({
+            title: _('Keep Card on Screen'),
+            subtitle: _('Show the same card above application windows without clicking'),
+        });
+        pinned.add(pinRow);
+        settings.bind('pin-card', pinRow, 'active', Gio.SettingsBindFlags.DEFAULT);
+        const cornerRow = new Adw.ComboRow({
+            title: _('Screen corner'),
+            model: new Gtk.StringList({strings: [
+                _('Top right'), _('Top left'), _('Bottom right'), _('Bottom left'),
+            ]}),
+        });
+        pinned.add(cornerRow);
+        this._bindEnum(settings, 'pinned-corner',
+            ['top-right', 'top-left', 'bottom-right', 'bottom-left'], cornerRow);
+        settings.bind('pin-card', cornerRow, 'sensitive', Gio.SettingsBindFlags.GET);
+
         const locationRow = new Adw.ComboRow({
             title: _('Location'),
             subtitle: _('Own panel button, or embedded in Quick Settings'),
@@ -272,18 +291,6 @@ export default class NowPlayingPreferences extends ExtensionPreferences {
         });
         card.add(progressRow);
 
-        const volumeRow = new Adw.SwitchRow({
-            title: _('Show the volume slider'),
-            subtitle: _('Only for players that carry a volume of their own'),
-        });
-        card.add(volumeRow);
-
-        const loopRow = new Adw.SwitchRow({
-            title: _('Show shuffle and repeat'),
-            subtitle: _('Only for players that support them'),
-        });
-        card.add(loopRow);
-
         const scrollTextRow = new Adw.SwitchRow({
             title: _('Scroll long text'),
             subtitle: _('Move a title sideways instead of cutting it off'),
@@ -292,7 +299,7 @@ export default class NowPlayingPreferences extends ExtensionPreferences {
 
         const icon = new Adw.PreferencesGroup({
             title: _('Icon'),
-            description: _('The equalizer, both in the top bar and on the card.'),
+            description: _('The equalizer in the top bar.'),
         });
         cardPage.add(icon);
 
@@ -460,8 +467,6 @@ export default class NowPlayingPreferences extends ExtensionPreferences {
         settings.bind('panel-text-width', textWidthRow, 'value', Gio.SettingsBindFlags.DEFAULT);
         settings.bind('show-artwork', artworkRow, 'active', Gio.SettingsBindFlags.DEFAULT);
         settings.bind('show-progress', progressRow, 'active', Gio.SettingsBindFlags.DEFAULT);
-        settings.bind('show-volume', volumeRow, 'active', Gio.SettingsBindFlags.DEFAULT);
-        settings.bind('show-loop-shuffle', loopRow, 'active', Gio.SettingsBindFlags.DEFAULT);
         settings.bind('scroll-text', scrollTextRow, 'active', Gio.SettingsBindFlags.DEFAULT);
         settings.bind('sort-playing-first', sortRow, 'active', Gio.SettingsBindFlags.DEFAULT);
         settings.bind('equalizer-accent', accentRow, 'active', Gio.SettingsBindFlags.DEFAULT);

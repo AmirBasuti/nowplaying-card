@@ -1,5 +1,4 @@
-/* Generated from stylesheet.css by tools/gen-stylesheets.py.
-   Edit the base file, then run the script. */
+/* Generated from stylesheet.css by tools/gen-stylesheets.py. */
 
 .np-equalizer {
     margin-left: 4px;
@@ -16,15 +15,15 @@
        track title from widening the whole Quick Settings menu. */
     max-width: 25em;
     background-color: rgba(255, 255, 255, 0.08); /* np-var: fill */
-    border-radius: 18px;
+    border-radius: 16px;
     padding: 10px;
-    spacing: 6px;
+    spacing: 4px;
     border: none;
     box-shadow: none;
 }
 
 .np-header-box {
-    spacing: 8px;
+    spacing: 6px;
 }
 
 .np-cover {
@@ -43,6 +42,7 @@
 
 .np-title {
     font-weight: bold;
+    font-size: 15px;
 }
 
 /* Second line under the title, and everything else that steps back: a
@@ -50,18 +50,19 @@
    own and a rule that sets one changes nothing. */
 .np-subtitle {
     color: rgba(255, 255, 255, 0.6); /* np-var: dim */
-    font-size: 0.9em;
+    font-size: 12px;
 }
 
 .np-seek-box {
-    spacing: 2px;
+    spacing: 6px;
 }
 
 /* Thin, handle-less bar so it reads as a progress line, not a volume slider. */
 .np-seek {
     height: 12px;
     min-width: 8em;
-    -barlevel-height: 4px;
+    -barlevel-height: 2px;
+    -barlevel-active-background-color: rgba(255, 255, 255, 0.6); /* np-var: dim */
     -slider-handle-radius: 0;
 }
 
@@ -77,13 +78,15 @@
 }
 
 .np-time {
-    font-size: 0.65em;
+    font-size: 11px;
+    padding-left: 3px;
     min-width: 2.6em;
     color: rgba(255, 255, 255, 0.6); /* np-var: dim */
 }
 
 .np-controls {
-    spacing: 0;
+    spacing: 2px;
+    height: 34px;
 }
 
 .np-control {
@@ -91,6 +94,11 @@
     border: none;
     box-shadow: none;
     padding: 4px;
+}
+
+.np-transport-primary {
+    padding: 6px;
+    background-color: rgba(255, 255, 255, 0.08); /* np-var: fill */
 }
 
 /* Nothing appears under the pointer: a transport button answers by moving
@@ -147,12 +155,12 @@
 }
 
 .np-top-row {
-    spacing: 14px;
+    spacing: 8px;
 }
 
 /* Everything that is not the cover: text, transport, seek bar. */
 .np-column {
-    spacing: 6px;
+    spacing: 2px;
 }
 
 /* Own popup: the card carries all the padding, so the menu adds none. */
@@ -164,7 +172,9 @@
 /* One width whatever the track: the text asks for a fixed share, so only a
    larger cover widens the card. In Quick Settings the grid sets the width. */
 .np-menu .np-card {
-    min-width: 20em;
+    width: 332px;
+    min-width: 332px;
+    max-width: 332px;
 }
 
 /* One surface, as on macOS. Only a folded row lights up under the pointer. */
@@ -218,7 +228,7 @@
    In the top bar there is nothing to hold open, so no floor there: a short
    title would only leave a gap between itself and the transport buttons. */
 .np-card .np-scroll {
-    min-width: 9em;
+    min-width: 7em;
 }
 
 .np-card-compact .np-scroll {
@@ -236,32 +246,6 @@
    selector outweighs the np-dark and np-light rules on the card meter. */
 .np-equalizer-accent, .np-card .np-card-equalizer.np-equalizer-accent {
     color: -st-accent-color;
-}
-
-.np-volume-box {
-    spacing: 8px;
-    padding: 0 2px;
-}
-
-.np-volume-button {
-    padding: 0;
-}
-
-.np-volume-icon {
-    color: rgba(255, 255, 255, 0.6); /* np-var: dim */
-}
-
-/* Same treatment as the seek bar: a plain line until it is aimed at. */
-.np-volume {
-    height: 16px;
-    min-width: 6em;
-    -barlevel-height: 4px;
-    -slider-handle-radius: 0;
-}
-
-.np-volume:hover, .np-volume:focus {
-    -barlevel-height: 6px;
-    -slider-handle-radius: 6px;
 }
 
 /* A toggle that is off keeps its place but steps back. */
@@ -305,6 +289,20 @@
     padding: 1px;
 }
 
+/* A quiet, single surface; the card owns its breathing room. */
+.np-pinned { border-radius: 14px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); }
+.np-lyrics-toggle { padding: 4px; }
+.np-lyrics-toggle:checked { background-color: transparent; }
+.np-lyrics-box { spacing: 4px; margin-top: 2px; padding-top: 6px; border-top: 1px solid rgba(127, 127, 127, 0.12); }
+.np-lyrics-scroll { max-height: 224px; min-height: 56px; }
+.np-lyrics-scroll.np-lyrics-synced { height: 224px; min-height: 224px; max-height: 224px; }
+.np-lyrics-content { spacing: 0; padding: 0 4px; }
+.np-lyrics-line { height: 56px; padding: 0 2px; font-size: 22px; font-weight: 600; text-align: center; }
+.np-lyrics-rtl { font-family: "Noto Sans Arabic"; font-size: 20px; text-align: center; }
+.np-lyrics-waiting { font-size: 22px; color: rgba(127, 127, 127, 0.65); }
+.np-lyrics-plain, .np-lyrics-message { height: auto; font-size: 17px; padding: 6px 2px; }
+.np-lyrics-retry { font-size: 0.85em; padding: 5px 10px; }
+
 /* For a shell theme that disagrees with the light/dark setting (#2):
    the extension marks the card and the button by their text colour. */
 .np-dark .np-card { background-color: rgba(255, 255, 255, 0.08); }
@@ -321,7 +319,6 @@
 .np-dark .np-placeholder { color: rgba(255, 255, 255, 0.6); }
 .np-dark .np-cover-button:hover .np-cover, .np-dark .np-cover-button:focus .np-cover { box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.45); }
 .np-dark .np-card-equalizer { color: rgba(255, 255, 255, 0.4); }
-.np-dark .np-volume-icon { color: rgba(255, 255, 255, 0.6); }
 .np-dark .np-control-off { color: rgba(255, 255, 255, 0.4); }
 .np-dark .np-panel-control:focus { background-color: rgba(255, 255, 255, 0.14); }
 .np-light .np-card { background-color: rgba(0, 0, 0, 0.06); }
@@ -338,6 +335,5 @@
 .np-light .np-placeholder { color: rgba(0, 0, 0, 0.55); }
 .np-light .np-cover-button:hover .np-cover, .np-light .np-cover-button:focus .np-cover { box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.35); }
 .np-light .np-card-equalizer { color: rgba(0, 0, 0, 0.35); }
-.np-light .np-volume-icon { color: rgba(0, 0, 0, 0.55); }
 .np-light .np-control-off { color: rgba(0, 0, 0, 0.35); }
 .np-light .np-panel-control:focus { background-color: rgba(0, 0, 0, 0.10); }

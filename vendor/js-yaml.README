@@ -1,0 +1,21 @@
+# js-yaml 5.5.0
+
+Unmodified `package/dist/js-yaml.mjs` and `package/LICENSE` from the official
+js-yaml 5.5.0 npm package (MIT). The ESM bundle has no external imports.
+
+- Registry: https://registry.npmjs.org/js-yaml/5.5.0
+- Archive: https://registry.npmjs.org/js-yaml/-/js-yaml-5.5.0.tgz
+- Source tag: https://github.com/nodeca/js-yaml/tree/5.5.0
+- Published source commit: cb62b2dbbaa0b3e7379d83a5d69d8d52d21b6efb
+- `js-yaml.mjs` SHA-256: `213470960d9c2ff1d01f9164e5017749bfc383d8a6ebb8683f35c76e8c6d052b`
+- `js-yaml.LICENSE` SHA-256: `a07bc24468b9654ce76a547d47a2db282d07733b715db4c73a98bd63961f9550`
+- Archive SHA-256: `23cb2e121ad69acd15fc786b7a9265a81eeeaa9f684ee73e717d6ecdbd8b0c90`
+
+Verified against the npm `latest` tag and official source on 2026-11-10; the
+archive matched npm's SHA-512 integrity value. Only the ESM bundle and license
+are vendored; the optional source map is omitted.
+
+Use `load(input, {schema: JSON_SCHEMA, maxAliases: 0, maxDepth: 16})` for
+restricted data parsing. Keep an input-size limit, catch every exception, and
+validate output shape and size. `JSON_SCHEMA` still accepts YAML syntax; it
+is not an application schema or a resource limit.

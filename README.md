@@ -1,286 +1,44 @@
-<p align="center">
-  <img src="docs/equalizer.webp" width="128" height="128" alt="Now Playing Card">
-</p>
+# Now Playing Card · Pinned Lyrics
 
-<h1 align="center">Now Playing Card</h1>
+A GNOME Shell extension that pins your now playing card above other windows. It works with Spotify and other players that expose MPRIS controls.
 
-<p align="center">
-  An animated equalizer in the top panel and a media card for any MPRIS player.
-</p>
+[Watch the 25-second desktop demo](docs/nowplaying-desktop-showcase.mp4)
 
-<p align="center">
-  <a href="https://extensions.gnome.org/extension/10736/now-playing-card/"><img alt="Get it on extensions.gnome.org" src="https://img.shields.io/badge/extensions.gnome.org-get%20it-4a86cf?logo=gnome&logoColor=white"></a>
-  <a href="https://extensions.gnome.org/extension/10736/now-playing-card/"><img alt="Downloads on extensions.gnome.org" src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fextensions.gnome.org%2Fextension-info%2F%3Fpk%3D10736&query=%24.downloads&label=downloads&color=4a86cf&logo=gnome&logoColor=white"></a>
-  <img alt="GNOME Shell 45 to 51" src="https://img.shields.io/badge/GNOME%20Shell-45%20to%2051-5c5cf5?logo=gnome&logoColor=white">
-  <img alt="License GPL-2.0-or-later" src="https://img.shields.io/badge/license-GPL--2.0--or--later-8f33c7">
-  <a href="https://github.com/sponsors/epogonii"><img alt="Sponsor" src="https://img.shields.io/badge/sponsor-GitHub-ea4aaa?logo=githubsponsors&logoColor=white"></a>
-</p>
+- Click the top bar icon to open or close the card. The card stays in its chosen corner as you switch or move windows.
+- Use the card to pause, skip or seek. Click **Lyrics** to open the lyrics panel.
+- Synchronized lyrics show the previous line, the current line and the next two lines. The panel scrolls as the song plays and fades in individual words when word timings are available. Persian and mixed right-to-left text use native text shaping.
 
-## What does this extension do?
+## Install
 
-Shows what is playing: an animated equalizer in the top panel and a media card
-with cover art, a seekable progress bar and transport controls for any MPRIS
-player.
+The extension was tested on GNOME Shell 50.1 on Wayland. Building from source requires Python 3, `zip` and the GLib schema tools. The extension uses the libsecret and libsoup 3 GObject introspection libraries provided by your distribution.
 
-> [!TIP]
-> **Nothing to configure to get going, nothing to install beside it.**
-> Enable it and it picks up whatever is already playing.
-
-## Screenshots
-
-The card in its own popup, opened from the panel button:
-
-<p align="center">
-  <img src="docs/screenshots/card.png" width="560" alt="A card with cover art, transport controls and a progress bar">
-</p>
-
-Several players at once: the one playing keeps the open card, the rest wait as
-rows and open on a click.
-
-<p align="center">
-  <img src="docs/screenshots/stack.png" width="560" alt="Three players stacked, the playing one open and two rows">
-</p>
-
-The track and the transport in the panel itself:
-
-<p align="center">
-  <img src="docs/screenshots/panel.png" width="640" alt="The panel showing the equalizer, the track and transport buttons">
-</p>
-
-In place of the bars, a spectrum analyzer that moves with the sound itself:
-
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/spectrum-dark.gif">
-    <img src="docs/spectrum-light.gif" width="252" alt="Sixteen columns of segments rising and falling with the music, in rainbow colours">
-  </picture>
-</p>
-
-Or the hills of the icon, drifting by and rising with it:
-
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/waves-dark.gif">
-    <img src="docs/waves-light.gif" width="252" alt="Three grey hills drifting by and rising with the music">
-  </picture>
-</p>
-
-Or the same hills as a ribbon that swells with the beat, in the spectrum's colours:
-
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/ribbon-dark.gif">
-    <img src="docs/ribbon-light.gif" width="252" alt="A rainbow ribbon that swells in the middle with the beat and narrows to a point at both ends">
-  </picture>
-</p>
-
-Or no button of its own, and the card at the bottom of Quick Settings:
-
-<p align="center">
-  <img src="docs/screenshots/quick-settings.png" width="520" alt="The card at the bottom of the Quick Settings menu">
-</p>
-
-Preferences:
-
-<p align="center">
-  <img src="docs/screenshots/preferences.png" width="560" alt="The preferences window on the Card page">
-</p>
-
-## Features
-
-- Every MPRIS player, however it is packaged: native, Flatpak, Snap
-- Cover art however the player hands it over: a file, a URL, or the picture
-  itself inline; a browser that writes the file a moment after it announces the
-  track is waited for, and a player whose artwork sits in a sandbox the shell
-  cannot read falls back to its own application icon
-- Artwork fills the square it is given, cropped rather than squeezed, whatever
-  shape it arrived in
-- Seekable progress bar: exact `SetPosition` where the player reports a track
-  id, a relative `Seek` otherwise
-- Volume slider for players that carry a volume of their own
-- Shuffle and repeat where the player supports them
-- Skip buttons only when the player says it can skip
-- A file with no tags is named after itself, so a local track is not left
-  carrying the player's own name on both lines
-- Transport, track text, wheel and middle click in the panel itself, so a track
-  can be changed without opening anything
-- The icon of the app that is playing in the panel, next to the equalizer or in
-  its place
-- Click the cover to switch to the player's own window
-- Several players share one popup as an accordion; a row opened by hand stays
-  open while its player is playing
-- Three cards at once by default, as many as ten if you want them; a player
-  that starts playing always gets one of the places
-- One popup width whatever the track is called, so nothing jumps between songs
-- Own panel button or embedded in Quick Settings, and the top-bar icon can be
-  there always, only while a player runs, or never
-- Right-click the panel button to choose when it shows, or to open the
-  preferences; or make the right button play, pause or skip instead
-- Equalizer bars with rounded ends, square ends, or rounded ends in colours
-  that keep moving, in the text colour or the system accent colour
-- The album art can be turned off: the card shows the player's icon instead
-  and fetches nothing from the web
-- Or a spectrum analyzer that moves with the sound itself, like the meter on a
-  hi-fi: segments, solid columns or columns mirrored around the middle, eight
-  to thirty-two of them, in the theme colour, with a red top, green to red or a
-  rainbow, and peaks that hang on for a moment; or the hills of the icon, in
-  its greys, drifting by and rising with the sound
-- Follows the system light and dark theme and switches with it
-- Hides GNOME's own media controls while it runs, and gives them straight back
-  when it stops
-
-A longer write-up, with the two D-Bus details that took most of the work:
-[Now Playing Card: a GNOME Shell media card for any MPRIS player](https://thelinuxnotes.com/now-playing-card-gnome-shell-mpris-media-extension/).
-
----
-
-## How to install
-
-#### From extensions.gnome.org
-
-<a href="https://extensions.gnome.org/extension/10736/now-playing-card/"><img src="docs/get-it-on-ego.png" width="228" alt="Get it on GNOME Extensions"></a>
-
-Review takes its time, so the version there can sit behind this branch.
-
-#### From a release
-
-Every tag builds the same zip that goes to extensions.gnome.org:
+From the repository root, run:
 
 ```sh
-gnome-extensions install --force nowplaying@epogonii.github.io.shell-extension.zip
-gnome-extensions enable nowplaying@epogonii.github.io
+bash tools/pack-extension.sh
+gnome-extensions install nowplaying-pinned@local.shell-extension.zip
 ```
 
-#### From the sources
+Log out and back in so GNOME Shell can load the extension, then enable it and open its settings:
 
 ```sh
-gnome-extensions pack --force --schema=schemas/org.gnome.shell.extensions.nowplaying.gschema.xml \
-    --extra-source=spectrum.js --extra-source=stylesheet.css \
-    --extra-source=stylesheet-light.css --extra-source=stylesheet-dark.css \
-    --extra-source=LICENSE --extra-source=icons
-gnome-extensions install --force nowplaying@epogonii.github.io.shell-extension.zip
-gnome-extensions enable nowplaying@epogonii.github.io
+gnome-extensions enable nowplaying-pinned@local
+gnome-extensions prefs nowplaying-pinned@local
 ```
 
-GNOME Shell 45 or newer, on Wayland or X11, and nothing else. Log out and back
-in first (X11: `Alt+F2`, then `r`): a running shell keeps an extension's
-JavaScript in memory for the life of the process, so new code needs a new shell.
-Preferences apply immediately.
+Choose the card's corner in preferences. Play a track and click the top bar icon to open the card.
 
-The spectrum analyzer listens to the default output through GStreamer's
-PulseAudio plugin, from gst-plugins-good, which PipeWire answers the same as
-PulseAudio does; without the plugin the columns only pretend. The sound is
-measured on the computer as it goes by and kept nowhere. Before GNOME 50.2 the
-microphone indicator shows while the analyzer listens.
+## Lyrics sources
 
----
+[LRCLIB](https://lrclib.net/) can match lyrics using track title, artist, album and duration without an account. The optional Spotify provider uses a login stored in the desktop keyring. It relies on an unofficial Spotify endpoint and falls back to LRCLIB if it cannot retrieve lyrics. The display uses line timing or plain text when individual word timings are unavailable.
 
-## Preferences
+## Development
 
-`gnome-extensions prefs nowplaying@epogonii.github.io`
+The tests use Node.js and GJS.
 
-Four pages, in the order the window shows them.
+```sh
+node --test tests/*.test.mjs
+glib-compile-schemas --strict --dry-run schemas
+```
 
-### Card
-
-| Setting | Meaning |
-| --- | --- |
-| Card size | Accordion with several players, always full, or always compact |
-| Cards at once | How many players the popup shows, one to ten |
-| Playing player first | Keep the card that is playing at the top |
-| Cover size | Artwork in a full card; medium is as tall as the text beside it |
-| Album art | Off, the player's icon stands in for the picture and nothing is fetched from the web |
-| Show the progress bar | Position and length of the track |
-| Show the volume slider | For players that carry a volume of their own |
-| Show shuffle and repeat | For players that support them |
-| Scroll long text | Move a title sideways instead of cutting it off |
-| Icon style | Square ends, rounded ends, or cycling colours |
-| Accent colour | The bars in the system accent colour, GNOME 47 or later; cycling colours keep their own |
-| Animate the icon | Move the equalizer bars during playback |
-| Frames a second | 10 to 60, 30 by default; fewer cost the shell less |
-| Show the spectrum | Columns that follow the sound in place of the bars in the top bar |
-| Follow all sound | Calls and games move the spectrum too, even with nothing playing |
-| Shape | Segments, solid columns, columns mirrored around the middle, waves: the hills of the icon, which keep its greys, or a ribbon: the same hills folded over a line through the middle, narrowing to a point at both ends, in the colours below |
-| Rounded ends | Solid and mirrored columns with round ends and the peaks as dots; the other shapes keep their own |
-| Colours | The theme colour, red at the top, green to red, or a rainbow |
-| Columns | Eight to thirty-two; more columns make the icon wider |
-| Peak markers | Hold the top of each column for a moment |
-| Track next to the spectrum | Same as the panel, title, or artist and title, while the spectrum is on; the spectrum stays beside it even with Icon in the panel off; panel mode only |
-
-Turned off, the spectrum gives the top bar back its bars in the icon style
-above. Shape, Colours, Columns, Peak markers, Follow all sound and Track next
-to the spectrum do nothing while it is off. With Animate the icon off, or
-animations off in the system, the spectrum stands still and does not listen.
-Follow all sound keeps it listening whenever the icon is on screen: the sound
-card does not go to sleep, and before GNOME 50.2 the microphone indicator stays
-on. With no player at all, the icon is only there with Visibility set to always.
-
-### Panel
-
-| Setting | Meaning |
-| --- | --- |
-| Location | Own panel button, or embedded in Quick Settings |
-| Panel area / Position | Where the button sits, panel mode only |
-| Visibility | Always, only while a player is running, or never; in Quick Settings mode never still leaves the card there |
-| Track in the panel | Nothing, title, or artist and title next to the icon |
-| Text width | Longest the panel text may get, in pixels |
-| Fixed text width | Keep that width even for a short track |
-| Icon in the panel | The equalizer next to the text, or the text alone |
-| Player icon | The icon of the app that is playing, next to the equalizer, or in its place with Icon in the panel off |
-| Scrolling over the button | Nothing, switch tracks, or change volume |
-| Controls in the panel | Transport buttons next to the icon |
-| Controls shown | Previous, play and next, or play and pause only |
-| Middle click | Nothing, play or pause, or next track |
-| Right click | The menu, play or pause, next track, or nothing; the menu still opens from the keyboard |
-
-### Players
-
-| Setting | Meaning |
-| --- | --- |
-| Hide the built-in media controls | Keep GNOME's own player out of the notification list |
-| Ignored players | Picked from the installed apps, or typed by hand |
-
-### About
-
-No settings of its own. The icon, buttons to report a problem or request a
-feature, the links from [Support](#support), a reset that puts the other three
-pages back to their defaults after asking, and the installed version.
-
----
-
-## Reporting issues
-
-Include, please:
-
-- Extension version
-- GNOME Shell version and your distribution
-- The player, and how it is installed (native, Flatpak, Snap)
-- `journalctl --user -b 0 -o cat /usr/bin/gnome-shell | grep nowplaying`
-- A screenshot where it makes sense
-
----
-
-## Support
-
-The extension is free and stays free. If it earned a coffee:
-
-<p align="center">
-  <a href="https://github.com/sponsors/epogonii"><img alt="Sponsor on GitHub" src="https://img.shields.io/badge/%E2%9D%A4%20Sponsor%20on%20GitHub-ea4aaa?style=for-the-badge&logo=githubsponsors&logoColor=white"></a>
-  <a href="https://www.paypal.com/paypalme/pogonii"><img alt="Buy me a coffee" src="https://img.shields.io/badge/%E2%98%95%20Buy%20me%20a%20coffee-003087?style=for-the-badge&logo=paypal&logoColor=white"></a>
-</p>
-
-| | |
-| --- | --- |
-| GitHub Sponsors | **[github.com/sponsors/epogonii](https://github.com/sponsors/epogonii)**, monthly or one time |
-| PayPal | **[paypal.me/pogonii](https://www.paypal.com/paypalme/pogonii)** |
-| Bitcoin | `bc1qe6fjj3uv23e2yx2ry3wwhyrl7s2pqshau7mga3` |
-| Ethereum | `0xDC9e1EfA0F8FAE71377F4018d4ff7D123369438e` |
-| Solana | `3sYQyR27CVz1VcwCfoDLUioaAHk8jspQaSDHXEvBALxg` |
-
-The same links sit on the About page of the extension's preferences.
-
----
-
-## License
-
-GPL-2.0-or-later, see [LICENSE](LICENSE).
+Based on [epogonii/nowplaying-card v1.0.12](https://github.com/epogonii/nowplaying-card/tree/v1.0.12). See [LICENSE](LICENSE) for the extension's license and [vendor/js-yaml.LICENSE](vendor/js-yaml.LICENSE) for the bundled parser.

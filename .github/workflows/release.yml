@@ -1,5 +1,4 @@
-# Tag a version and the zip that gets uploaded to extensions.gnome.org is
-# attached to the release, built from the same sources as the tag.
+# Attach the pinned extension zip to the release for a version tag.
 name: Release
 
 on:
@@ -14,7 +13,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     env:
-      ZIP: nowplaying@epogonii.github.io.shell-extension.zip
+      ZIP: nowplaying-pinned@local.shell-extension.zip
     steps:
       - uses: actions/checkout@v5
 
@@ -36,14 +35,7 @@ jobs:
         run: glib-compile-schemas --strict --dry-run schemas
 
       - name: Build the zip
-        run: |
-          python3 tools/gen-stylesheets.py
-          zip -r "$ZIP" \
-            metadata.json extension.js prefs.js spectrum.js stylesheet.css \
-            stylesheet-light.css stylesheet-dark.css LICENSE \
-            icons/qr/bitcoin.svg icons/qr/ethereum.svg \
-            icons/qr/solana.svg \
-            schemas/org.gnome.shell.extensions.nowplaying.gschema.xml
+        run: tools/pack-extension.sh
 
       # The changelog section for this version becomes the release notes; if
       # there is none, let GitHub write them from the commits. A tag that gets

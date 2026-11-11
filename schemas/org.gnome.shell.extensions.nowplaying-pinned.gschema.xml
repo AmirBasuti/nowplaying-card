@@ -1,85 +1,100 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <schemalist>
-  <enum id="org.gnome.shell.extensions.nowplaying.location">
+  <enum id="org.gnome.shell.extensions.nowplaying-pinned.location">
     <value value="0" nick="panel"/>
     <value value="1" nick="quick-settings"/>
   </enum>
-  <enum id="org.gnome.shell.extensions.nowplaying.panel-box">
+  <enum id="org.gnome.shell.extensions.nowplaying-pinned.panel-box">
     <value value="0" nick="left"/>
     <value value="1" nick="center"/>
     <value value="2" nick="right"/>
   </enum>
-  <enum id="org.gnome.shell.extensions.nowplaying.card-layout">
+  <enum id="org.gnome.shell.extensions.nowplaying-pinned.card-layout">
     <value value="0" nick="auto"/>
     <value value="1" nick="full"/>
     <value value="2" nick="compact"/>
   </enum>
-  <enum id="org.gnome.shell.extensions.nowplaying.cover-size">
+  <enum id="org.gnome.shell.extensions.nowplaying-pinned.cover-size">
     <value value="0" nick="small"/>
     <value value="1" nick="medium"/>
     <value value="2" nick="large"/>
   </enum>
-  <enum id="org.gnome.shell.extensions.nowplaying.panel-scroll">
+  <enum id="org.gnome.shell.extensions.nowplaying-pinned.panel-scroll">
     <value value="0" nick="none"/>
     <value value="1" nick="track"/>
     <value value="2" nick="volume"/>
   </enum>
-  <enum id="org.gnome.shell.extensions.nowplaying.panel-middle-click">
+  <enum id="org.gnome.shell.extensions.nowplaying-pinned.panel-middle-click">
     <value value="0" nick="none"/>
     <value value="1" nick="play-pause"/>
     <value value="2" nick="next"/>
   </enum>
-  <enum id="org.gnome.shell.extensions.nowplaying.panel-right-click">
+  <enum id="org.gnome.shell.extensions.nowplaying-pinned.panel-right-click">
     <value value="0" nick="menu"/>
     <value value="1" nick="play-pause"/>
     <value value="2" nick="next"/>
     <value value="3" nick="none"/>
   </enum>
-  <enum id="org.gnome.shell.extensions.nowplaying.panel-controls-shown">
+  <enum id="org.gnome.shell.extensions.nowplaying-pinned.panel-controls-shown">
     <value value="0" nick="all"/>
     <value value="1" nick="play"/>
   </enum>
-  <enum id="org.gnome.shell.extensions.nowplaying.equalizer-style">
+  <enum id="org.gnome.shell.extensions.nowplaying-pinned.equalizer-style">
     <value value="0" nick="bars"/>
     <value value="1" nick="rounded"/>
     <value value="2" nick="rainbow"/>
   </enum>
-  <enum id="org.gnome.shell.extensions.nowplaying.spectrum-shape">
+  <enum id="org.gnome.shell.extensions.nowplaying-pinned.spectrum-shape">
     <value value="0" nick="segments"/>
     <value value="1" nick="solid"/>
     <value value="2" nick="mirrored"/>
     <value value="3" nick="waves"/>
     <value value="4" nick="ribbon"/>
   </enum>
-  <enum id="org.gnome.shell.extensions.nowplaying.spectrum-colors">
+  <enum id="org.gnome.shell.extensions.nowplaying-pinned.spectrum-colors">
     <value value="0" nick="plain"/>
     <value value="1" nick="classic"/>
     <value value="2" nick="level"/>
     <value value="3" nick="rainbow"/>
   </enum>
-  <enum id="org.gnome.shell.extensions.nowplaying.indicator-visibility">
+  <enum id="org.gnome.shell.extensions.nowplaying-pinned.indicator-visibility">
     <value value="0" nick="always"/>
     <value value="1" nick="active"/>
     <value value="2" nick="never"/>
   </enum>
-  <enum id="org.gnome.shell.extensions.nowplaying.panel-text">
+  <enum id="org.gnome.shell.extensions.nowplaying-pinned.panel-text">
     <value value="0" nick="none"/>
     <value value="1" nick="title"/>
     <value value="2" nick="artist-title"/>
   </enum>
-  <enum id="org.gnome.shell.extensions.nowplaying.spectrum-text">
+  <enum id="org.gnome.shell.extensions.nowplaying-pinned.spectrum-text">
     <value value="0" nick="panel"/>
     <value value="1" nick="title"/>
     <value value="2" nick="artist-title"/>
   </enum>
-  <schema id="org.gnome.shell.extensions.nowplaying"
-          path="/org/gnome/shell/extensions/nowplaying/">
-    <key name="location" enum="org.gnome.shell.extensions.nowplaying.location">
+  <enum id="org.gnome.shell.extensions.nowplaying-pinned.pinned-corner">
+    <value value="0" nick="top-right"/>
+    <value value="1" nick="top-left"/>
+    <value value="2" nick="bottom-right"/>
+    <value value="3" nick="bottom-left"/>
+  </enum>
+  <schema id="org.gnome.shell.extensions.nowplaying-pinned"
+          path="/org/gnome/shell/extensions/nowplaying-pinned/">
+    <key name="pin-card" type="b">
+      <default>false</default>
+      <summary>Keep Card on Screen</summary>
+      <description>Show the original card above application windows without opening a popup.</description>
+    </key>
+    <key name="pinned-corner" enum="org.gnome.shell.extensions.nowplaying-pinned.pinned-corner">
+      <default>'top-right'</default>
+      <summary>Screen corner for the pinned card</summary>
+    </key>
+    <key name="location" enum="org.gnome.shell.extensions.nowplaying-pinned.location">
       <default>'panel'</default>
       <summary>Where the card lives</summary>
       <description>Show a dedicated panel button with its own popup, or embed the card in the Quick Settings menu.</description>
     </key>
-    <key name="panel-box" enum="org.gnome.shell.extensions.nowplaying.panel-box">
+    <key name="panel-box" enum="org.gnome.shell.extensions.nowplaying-pinned.panel-box">
       <default>'right'</default>
       <summary>Panel area</summary>
       <description>Which part of the top panel holds the button.</description>
@@ -90,7 +105,7 @@
       <summary>Position in the panel area</summary>
       <description>Order of the button within the chosen panel area.</description>
     </key>
-    <key name="indicator-visibility" enum="org.gnome.shell.extensions.nowplaying.indicator-visibility">
+    <key name="indicator-visibility" enum="org.gnome.shell.extensions.nowplaying-pinned.indicator-visibility">
       <default>'active'</default>
       <summary>Show in the top bar</summary>
       <description>Always, only while a media player is running, or never. In the Quick Settings mode the card stays reachable there even with never.</description>
@@ -100,7 +115,7 @@
       <summary>Hide the built-in media controls</summary>
       <description>Remove GNOME's own media player entry from the notification list so the card is not shown twice. Restored as soon as the extension is turned off.</description>
     </key>
-    <key name="card-layout" enum="org.gnome.shell.extensions.nowplaying.card-layout">
+    <key name="card-layout" enum="org.gnome.shell.extensions.nowplaying-pinned.card-layout">
       <default>'auto'</default>
       <summary>Card size</summary>
       <description>With several players one card is open and the rest are single rows, or always full cards, or always compact ones.</description>
@@ -115,7 +130,7 @@
       <summary>Show the controls in the panel</summary>
       <description>Put the transport next to the icon, so a track can be changed without opening the card.</description>
     </key>
-    <key name="panel-controls-shown" enum="org.gnome.shell.extensions.nowplaying.panel-controls-shown">
+    <key name="panel-controls-shown" enum="org.gnome.shell.extensions.nowplaying-pinned.panel-controls-shown">
       <default>'all'</default>
       <summary>Which controls the panel shows</summary>
       <description>Previous, play and next, or play and pause alone.</description>
@@ -126,7 +141,7 @@
       <summary>Cards at once</summary>
       <description>How many players the popup shows. Anything above that stays out of it, and a player that starts playing takes one of the places.</description>
     </key>
-    <key name="equalizer-style" enum="org.gnome.shell.extensions.nowplaying.equalizer-style">
+    <key name="equalizer-style" enum="org.gnome.shell.extensions.nowplaying-pinned.equalizer-style">
       <default>'rounded'</default>
       <summary>Icon style</summary>
       <description>Shape and colour of the equalizer bars: square ends, rounded ends, or rounded ends that cycle through colours while a player is playing.</description>
@@ -151,7 +166,7 @@
       <summary>Show the spectrum analyzer</summary>
       <description>Columns that follow the sound take the place of the bars in the top bar, and the bars on the card follow the sound too. It only listens while the icon is animated. Turned off, the bars come back in their own style.</description>
     </key>
-    <key name="spectrum-shape" enum="org.gnome.shell.extensions.nowplaying.spectrum-shape">
+    <key name="spectrum-shape" enum="org.gnome.shell.extensions.nowplaying-pinned.spectrum-shape">
       <default>'segments'</default>
       <summary>Spectrum shape</summary>
       <description>Columns of separate segments, solid columns, solid columns that grow both ways from the middle, the hills of the icon rising with the sound, or the same hills folded over a line through the middle.</description>
@@ -161,7 +176,7 @@
       <summary>Round the ends of the columns</summary>
       <description>Solid and mirrored columns with round ends and the peaks as dots. Segments are too short to round, and the waves and the ribbon have no ends, so they keep their own shape.</description>
     </key>
-    <key name="spectrum-colors" enum="org.gnome.shell.extensions.nowplaying.spectrum-colors">
+    <key name="spectrum-colors" enum="org.gnome.shell.extensions.nowplaying-pinned.spectrum-colors">
       <default>'classic'</default>
       <summary>Spectrum colours</summary>
       <description>The colour of the panel text, the same with a red top, green to yellow to red by height, or a colour of its own for every column.</description>
@@ -182,12 +197,12 @@
       <summary>Follow all sound</summary>
       <description>Move the spectrum with any sound, calls and games included, even while no player is playing. It then listens whenever the icon is on screen; with no player at all the icon is only there with Always Show in Top Bar, and before GNOME 50.2 the microphone indicator stays on.</description>
     </key>
-    <key name="spectrum-text" enum="org.gnome.shell.extensions.nowplaying.spectrum-text">
+    <key name="spectrum-text" enum="org.gnome.shell.extensions.nowplaying-pinned.spectrum-text">
       <default>'panel'</default>
       <summary>Track next to the spectrum</summary>
       <description>While the spectrum is on, show the title, or the artist and the title, next to it; the spectrum stays even with the panel icon off. With panel, the panel text and icon settings decide.</description>
     </key>
-    <key name="cover-size" enum="org.gnome.shell.extensions.nowplaying.cover-size">
+    <key name="cover-size" enum="org.gnome.shell.extensions.nowplaying-pinned.cover-size">
       <default>'medium'</default>
       <summary>Cover size</summary>
       <description>How large the album art is drawn in a full-size card.</description>
@@ -220,21 +235,21 @@
       <summary>Scroll text that does not fit</summary>
       <description>Move a long title sideways instead of cutting it off.</description>
     </key>
-    <key name="panel-scroll" enum="org.gnome.shell.extensions.nowplaying.panel-scroll">
+    <key name="panel-scroll" enum="org.gnome.shell.extensions.nowplaying-pinned.panel-scroll">
       <default>'track'</default>
       <summary>Scrolling over the panel button</summary>
       <description>What the mouse wheel does over the button: nothing, switch tracks, or change the player volume.</description>
     </key>
-    <key name="panel-middle-click" enum="org.gnome.shell.extensions.nowplaying.panel-middle-click">
+    <key name="panel-middle-click" enum="org.gnome.shell.extensions.nowplaying-pinned.panel-middle-click">
       <default>'play-pause'</default>
       <summary>Middle click on the panel button</summary>
     </key>
-    <key name="panel-right-click" enum="org.gnome.shell.extensions.nowplaying.panel-right-click">
+    <key name="panel-right-click" enum="org.gnome.shell.extensions.nowplaying-pinned.panel-right-click">
       <default>'menu'</default>
       <summary>Right click on the panel button</summary>
       <description>The menu that picks when the button shows, play or pause, the next track, or nothing. The menu still opens from the keyboard.</description>
     </key>
-    <key name="panel-text" enum="org.gnome.shell.extensions.nowplaying.panel-text">
+    <key name="panel-text" enum="org.gnome.shell.extensions.nowplaying-pinned.panel-text">
       <default>'none'</default>
       <summary>Track shown in the panel</summary>
       <description>Show the title, the artist and the title, or nothing but the icon.</description>

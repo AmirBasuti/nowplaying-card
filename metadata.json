@@ -1,7 +1,11 @@
 {
-  "uuid": "nowplaying@epogonii.github.io",
-  "name": "Now Playing Card",
-  "description": "Animated Now Playing indicator with a compact media card: cover art, a seekable progress bar and transport controls for any MPRIS player.",
+  "description": "Readable pinned Now Playing card with four lyric cues, continuous native scrolling, real word-timed fades when available, and Persian text support. Based on epogonii/nowplaying-card.",
+  "donations": {
+    "github": "epogonii",
+    "paypal": "pogonii"
+  },
+  "name": "Now Playing Card — Pinned",
+  "settings-schema": "org.gnome.shell.extensions.nowplaying-pinned",
   "shell-version": [
     "45",
     "46",
@@ -11,11 +15,8 @@
     "50",
     "51"
   ],
-  "version-name": "1.0.12",
   "url": "https://github.com/epogonii/nowplaying-card",
-  "donations": {
-    "github": "epogonii",
-    "paypal": "pogonii"
-  },
-  "settings-schema": "org.gnome.shell.extensions.nowplaying"
+  "uuid": "nowplaying-pinned@local",
+  "version": 8,
+  "version-name": "1.4.1-pinned-larger-cover"
 }
