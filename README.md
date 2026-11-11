@@ -2,6 +2,8 @@
 
 A GNOME Shell extension that pins your now playing card above other windows. It works with Spotify and other players that expose MPRIS controls.
 
+![Animated demo of the pinned Now Playing card and synchronized lyrics](docs/nowplaying-desktop-showcase.gif)
+
 [Watch the 25-second desktop demo](docs/nowplaying-desktop-showcase.mp4)
 
 - Click the top bar icon to open or close the card. The card stays in its chosen corner as you switch or move windows.
